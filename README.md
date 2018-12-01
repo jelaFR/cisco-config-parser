@@ -1,6 +1,5 @@
 # cisco-config-parser
 This script parse Cisco configuration files and output to an excel file
-This in initially posted by Jean-Eudes LAYRISSE on 01/12/2018
 
 In order to work, you'll need to install xlsxwriter and ciscoconfparse
 
