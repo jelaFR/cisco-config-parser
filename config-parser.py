@@ -33,6 +33,9 @@ def sh_run_to_dict(filename, output_dictionary, platform="ios"):
         print("Error: please provide a valid platform name")
         return
     hostname = parse.find_lines ("hostname")
+    if len(hostname) == 0:
+        # it seemds that it is not an Cisco config file
+        return
     hostname = hostname[0].replace ('hostname ', '')
     output_dictionary[hostname] = {}
     #Get global voice vlan informations
@@ -140,45 +143,72 @@ def dict_to_xlsx(dictionary,out_file):
     import xlsxwriter
     # Check if file exists and remove previous one
     if os.path.isfile(out_file):
-        os.remove(out_file)
+        try:
+            os.remove(out_file)
+        except PermissionError:
+            while True:
+                try:
+                    os.remove(out_file)
+                    break
+                except PermissionError:
+                    input(f"Please close {os.path.basename(out_file)} Excel file and press enter")
     # Create an excel workbook
     workbook = xlsxwriter.Workbook(out_file)
+    worksheet = workbook.add_worksheet("Analyse")
     # Create excel worksheet with keys
-    for key in dictionary.keys():
-        #Add one worksheet per key (hostname)
-        worksheet = workbook.add_worksheet(key)
-        # Start from the first cell
-        row = 0
-        col = 0
-        for item in dictionary[key].keys():
-            worksheet.write(row, col, "Interface")
-            for subitem in dictionary[key][item].keys():
+    row = 1
+    for switch_name in dictionary:
+        for switch_iface in dictionary[switch_name]:
+            col = 2
+            for iface_param_name in dictionary[switch_name][switch_iface]:
+                iface_param_value = dictionary[switch_name][switch_iface][iface_param_name]
+                if row == 1: # We are writing headers
+                    if col == 2: # We are writing hostname + iface headers
+                        worksheet.write(row-1, col-2, "Hostname")
+                        worksheet.write(row-1, col-1, "Iface")
+                        worksheet.set_column(row-1, col-2, 30)
+                        worksheet.set_column(row-1, col-1, 30)
+                    worksheet.write(row-1,col,iface_param_name)
+                    worksheet.set_column(row-1, col, 30)
+                # Once header are written, proceed normal behavior
+                if col == 2:
+                    worksheet.write(row, col-2, switch_name)
+                    worksheet.write(row, col-1, switch_iface)       
+                worksheet.write(row, col, str(iface_param_value))
                 col += 1
-                worksheet.write(row,col,subitem)
             row += 1
-            break
-        # Parse dictionary
-        col = 0
-        for item in dictionary[key]:
-            worksheet.write(row, col, item)
-            worksheet.set_column(row,col,30)
-            for subitem in dictionary[key][item].values():
-                col += 1
-                worksheet.write(row, col, str(subitem))
-                worksheet.set_column(row, col, 30)
-            row += 1
-            col = 0
-
     workbook.close()
 
 
-# Vars
-directory = r"PATH_WHERE_FILES_ARE_LOCATED"
-dict = {}
-out_file = "output.xlsx"
+if __name__ == "__main__":
+    try:
+        import os
+        from tqdm import tqdm
+        welcome_msg = "Create Excel file from CISCO cfg with one line per interface"
+        welcome_len = len(welcome_msg) + 4
+        print("*"*welcome_len)
+        print("*",welcome_msg,"*")
+        print("*"*welcome_len)
+        # Vars
+        while True:
+            directory = input("Please type path where files are located:")
+            if os.path.isdir(directory):
+                break
+        dict = {}
+        out_file = os.path.join(directory,"output.xlsx")
 
-# Main
-file_list = search_file_in_directory(directory,filter="confg")
-for file in file_list:
-    sh_run_to_dict (file,dict,"ios")
-dict_to_xlsx(dict,out_file)
+        # Main
+        file_list = search_file_in_directory(directory,filter="confg")
+        for file in tqdm(file_list,desc="Analysing cisco Cfg file"):
+            sh_run_to_dict (file,dict,"ios")
+        dict_to_xlsx(dict,out_file)
+
+        end_msg = "Script is now finished, out file is named: "+os.path.basename(out_file)
+        end_len = len(end_msg) + 4
+        print("*"*end_len)
+        print("*",end_msg,"*")
+        print("*"*end_len)
+    except KeyboardInterrupt:
+        os.system("cls")
+        print("\n[KeyInterrupt] Exiting as requested")
+        exit(0)
