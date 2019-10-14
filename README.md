@@ -1,11 +1,6 @@
 # cisco-config-parser
 This script parse Cisco configuration files and output to an excel file
 
-In order to work, you'll need to install xlsxwriter and ciscoconfparse
-
-Change directory variable to the path where configuration files are located
-More, you can change the out_file variable to specify the path to the output file.
-
 For now, this script is tested with Catalyst platforms (2960,3750,4500,6500) and on Nexus platform (Nexus3000)
 This should work on other Cisco models as this is based on the CiscoConfParse library.
 
@@ -20,4 +15,3 @@ voice_vlan	: voice vlan configured on the port or globally configured using netw
 trunk_vlan	: trunk vlan configured
 trunk_native	: native vlan on trunk
 previous_config : a list with the full previous configuration
-
