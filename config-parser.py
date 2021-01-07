@@ -34,25 +34,24 @@ def search_file_in_directory(in_directory,filter=""):
     return file_list
 
 
-def sh_run_to_dict(filename, platform="ios"):
+def sh_run_to_dict(filename):
     """
     This script parse "show running-config" file looking for parameters
     This is working on Cisco Catalyst and Nexus switches
     :param filename: Filename where output of "show running-config" is located
-    :param platform: "ios" or "Catalyst" for regular Catalyst IOS; "nxos" or "nexus" for Cisco Nexus platform
     :return: A dictionary containing list of switches and ifaces parameters
     """
 
     ##
-    # Store the whole configuration file inside CiscoConfParse object
+    # Try to automatically determine the platform
     ##
-    if (platform.lower() == "catalyst") or (platform.lower() == "ios"):
-        parse = CiscoConfParse (filename, factory=True, syntax='ios')
-    elif (platform.lower() == "nexus") or (platform.lower() == "nxos"):
+    try:
         parse = CiscoConfParse (filename, factory=True, syntax='nxos')
-    else:
-        print("Error: please provide a valid platform name")
-        return
+        if len(parse.re_search_children("^interface \S+Ethernet")) != 0:
+            parse = CiscoConfParse (filename, factory=True, syntax='ios')
+    except ValueError:
+        parse = CiscoConfParse (filename, factory=True, syntax='ios')
+
 
     ##
     # Get infos from the top of the config file
@@ -187,6 +186,13 @@ def sh_run_to_dict(filename, platform="ios"):
             else:
                 iface_duplex = 'auto'
             SWITCHES_PARAMS[hostname][iface_name]["iface_duplex"] = iface_duplex
+    
+    #SVI List
+    all_routed_ifaces = parse.find_objects_w_child(parentspec=r"^interface Vlan", childspec=r"ip address")
+    for iface_param in all_routed_ifaces:
+        vlan_id = iface_param.text.strip("interface Vlan")
+        ip_address_cidr = f"{iface_param.ip_addr}/{iface_param.ipv4_masklength}"
+        GLOBAL_SVI[(hostname.lower(),vlan_id)] = ip_address_cidr
 
 
 def dict_to_xlsx(out_file):
@@ -211,7 +217,9 @@ def dict_to_xlsx(out_file):
     # Create an excel workbook
     workbook = Wb(out_file)
     worksheet_iface = workbook.add_worksheet("ifaces")
+    worksheet_iface.freeze_panes(1, 1)
     worksheet_vlans = workbook.add_worksheet("vlan_list")
+    worksheet_vlans.freeze_panes(1, 1)
 
     # Create specific format
     cell_green = workbook.add_format({'bold': True, 'font_color': 'white', 'bg_color': 'green'})
@@ -247,7 +255,7 @@ def dict_to_xlsx(out_file):
                 for sw_hostname in HOSTNAME_LIST:
                     # Vlan exist on this switch
                     if sw_hostname in GLOBAL_VLAN[vlan_id]["switches"]:
-                        vlan_params_list.append("Yes")
+                        vlan_params_list.append(GLOBAL_SVI.get((sw_hostname, vlan_id),"Yes"))
                     else: # Vlan does not exist
                         vlan_params_list.append("No")
             elif vlan_params == "vlan_name":
@@ -290,12 +298,13 @@ if __name__ == "__main__":
         # Define global vars
         SWITCHES_PARAMS = dict()
         GLOBAL_VLAN = dict()
+        GLOBAL_SVI = dict()
         HOSTNAME_LIST = list()
 
         # Main
         file_list = search_file_in_directory(in_dir,filter="config")
         for filename in tqdm(file_list,desc="Analysing cisco Cfg file"):
-            sh_run_to_dict (filename, "nxos")
+            sh_run_to_dict (filename)
         dict_to_xlsx(out_file)
 
         end_msg = "Script is now finished, out file is named: "+os.path.basename(out_file)
