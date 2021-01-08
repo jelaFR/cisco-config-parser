@@ -289,8 +289,7 @@ if __name__ == "__main__":
         print("*"*welcome_len)
         # Vars
         while True:
-            in_dir = r"D:\Nextcloud\Professionnel\Documents\SFR Business Solutions\Clients\Groupe prévoir\2021 - Nouveau DC Equinix\Docs de travail\20210106"
-            #in_dir = input("Please type path where files are located:")
+            in_dir = input("Please type path where files are located:")
             if os.path.isdir(in_dir):
                 break
         out_file = os.path.join(in_dir,"output.xlsx")
